@@ -1,12 +1,22 @@
-# ==========================================================================================
-# AWS Provider Configuration
-# ------------------------------------------------------------------------------------------
-# Purpose:
-#   - Defines the AWS provider and its default region for all Terraform resources
-#   - Ensures all modules and resources are deployed within the same region
-#   - This configuration is required before any AWS resource declarations
-# ==========================================================================================
+terraform {
+  required_providers {
+    google = {
+      source  = "hashicorp/google"
+      version = "~> 5.0"
+    }
+    random = {
+      source  = "hashicorp/random"
+      version = "~> 3.0"
+    }
+  }
+}
 
-provider "aws" {
-  region = "us-east-1" # Primary AWS region (N. Virginia)
+locals {
+  credentials = jsondecode(file("${path.module}/../credentials.json"))
+}
+
+provider "google" {
+  credentials = file("${path.module}/../credentials.json")
+  project     = local.credentials.project_id
+  region      = "us-central1"
 }
