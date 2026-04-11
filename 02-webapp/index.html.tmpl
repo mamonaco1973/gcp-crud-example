@@ -254,15 +254,25 @@
 
   // ===================== Helpers ====================
   async function api(path, method = "GET", body) {
-    const res = await fetch(API_BASE_URL + path, {
+    const url = API_BASE_URL + path;
+    console.log(`[API] ${method} ${url}`, body ? JSON.stringify(body) : "");
+
+    const res = await fetch(url, {
       method,
       headers: { "Content-Type": "application/json" },
       body: body ? JSON.stringify(body) : undefined
     });
 
     const text = await res.text();
-    if (!res.ok) throw new Error(text || res.status);
-    return text ? JSON.parse(text) : null;
+    const parsed = text ? JSON.parse(text) : null;
+
+    if (!res.ok) {
+      console.error(`[API] ${method} ${url} -> ${res.status}`, text);
+      throw new Error(text || res.status);
+    }
+
+    console.log(`[API] ${method} ${url} -> ${res.status}`, parsed);
+    return parsed;
   }
 
   function setStatus(msg) {

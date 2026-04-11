@@ -27,6 +27,13 @@ resource "google_storage_bucket_object" "index_html" {
   cache_control = "no-store, no-cache, must-revalidate, max-age=0"
 }
 
+resource "google_storage_bucket_object" "favicon" {
+  name         = "favicon.ico"
+  bucket       = google_storage_bucket.webapp.name
+  source       = "${path.module}/favicon.ico"
+  content_type = "image/x-icon"
+}
+
 output "webapp_url" {
   value = "https://storage.googleapis.com/${google_storage_bucket.webapp.name}/index.html"
 }

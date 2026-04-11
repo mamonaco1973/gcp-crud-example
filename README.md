@@ -14,6 +14,8 @@ and delete notes from a browser.
 
 ![webapp](webapp.png)
 
+![diagram](gcp-crud-example.png)
+
 This design follows a **serverless microservice architecture** where a single
 Cloud Function routes requests by HTTP method and path, Firestore provides fully
 managed NoSQL persistence, and GCP handles scaling, availability, and fault
