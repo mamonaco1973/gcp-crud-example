@@ -26,15 +26,15 @@
 
 [ Highlight browser and Cloud Storage bucket ]
 
-"The user opens a static web page — just an HTML file served directly from a public Cloud Storage bucket."
+"The user opens a static web page — which is just an HTML file served directly from a public Cloud Storage bucket."
 
 [ Highlight Cloud Function ]
 
-"The frontend talks to a Cloud Functions 2nd Gen HTTP function over HTTPS. One Python file handles all the routes — POST to create, GET to list, GET by ID, PUT to update, DELETE to remove. Because 2nd Gen passes the full request path, there's no API Gateway needed — the function does its own routing."
+"The frontend talks to a Cloud Functions over HTTPS. One Python file handles all the routes — POST to create, GET to list, GET by ID, PUT to update, DELETE to remove. "
 
 [ Highlight Firestore ]
 
-"The backend stores data in Firestore. Each note is a document in the notes collection, keyed by a UUID. The function connects using Application Default Credentials from its service account."
+"The backend stores data in Firestore. Each note is a JSON document, and the Cloud Functions read and write directly to it."
 
 ---
 
@@ -66,15 +66,15 @@
 
 [ GCP Console — Cloud Functions ]
 
-"The notes function is deployed and public."
+"The notes Cloud Functions are deployed and public. This is the compute layer for the API."
 
 [ Show function details — runtime, entry point, trigger URL ]
 
-"Python 3.11, entry point notes, HTTP trigger. The URL follows the standard Cloud Functions 2nd Gen pattern — region and project ID in the hostname."
+"The Cloud Functions are implemented in Python, and the HTTP routes are handled directly in the code."
 
 [ GCP Console — Firestore ]
 
-"Next — Firestore. Native mode, us-central1. The notes collection will populate as we use the API."
+"Next is Firestore. This is the storage layer for the API."
 
 [ GCP Console — Cloud Storage, web bucket ]
 

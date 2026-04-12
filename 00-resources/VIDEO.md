@@ -28,7 +28,7 @@ https://github.com/mamonaco1973/gcp-crud-example/blob/main/README.md
 
 TIMESTAMPS
 00:00 Introduction
-00:22 Architecture
-00:51 Build the Code
-01:07 Build Results
-01:39 Demo
+00:17 Architecture
+00:43 Build the Code
+00:58 Build Results
+01:22 Demo
