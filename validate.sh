@@ -6,6 +6,21 @@ NOTES_URL="https://us-central1-${project_id}.cloudfunctions.net/notes"
 
 echo "NOTE: Validating API at ${NOTES_URL}"
 
+# ─── Wait for function to be ready ──────────────────────────────────────────────
+echo "NOTE: Waiting for function to be ready..."
+for attempt in {1..10}; do
+  if curl -sf "${NOTES_URL}" > /dev/null 2>&1; then
+    echo "NOTE: Function is ready."
+    break
+  fi
+  if [[ "${attempt}" -eq 10 ]]; then
+    echo "ERROR: Function did not become ready after 10 attempts."
+    exit 1
+  fi
+  echo "NOTE: Attempt ${attempt} failed, retrying in 10 seconds..."
+  sleep 10
+done
+
 # ─── Create 5 notes ─────────────────────────────────────────────────────────────
 echo "NOTE: Creating 5 test notes..."
 NOTE_IDS=()
