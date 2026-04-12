@@ -4,6 +4,8 @@ This project delivers a fully automated **serverless CRUD (Create, Read, Update,
 Delete) API** on Google Cloud Platform, built using **Cloud Functions (2nd Gen)**,
 **Cloud Firestore**, and **Cloud Storage**.
 
+![webapp](webapp.png)
+
 It uses **Terraform** and **Python** to provision and deploy a **stateless,
 REST-style backend** that exposes HTTP endpoints for managing simple "notes" data
 — all without running or managing any virtual machines or containers.
@@ -11,8 +13,6 @@ REST-style backend** that exposes HTTP endpoints for managing simple "notes" dat
 For testing and demonstration purposes, a lightweight **HTML web frontend**
 interacts directly with the deployed API, allowing users to create, view, update,
 and delete notes from a browser.
-
-![webapp](webapp.png)
 
 ![diagram](gcp-crud-example.png)
 
