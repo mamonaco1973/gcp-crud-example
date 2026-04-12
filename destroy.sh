@@ -1,25 +1,24 @@
 #!/usr/bin/env bash
 set -euo pipefail
 
-# ─── Clear Firestore notes collection ───────────────────────────────────────────
-if [ -f credentials.json ]; then
-  project_id=$(jq -r '.project_id' credentials.json)
-  client_email=$(jq -r '.client_email' credentials.json)
-  gcloud auth activate-service-account "${client_email}" --key-file=credentials.json 2>/dev/null
-  gcloud config set project "${project_id}" 2>/dev/null
+project_id=$(jq -r '.project_id' credentials.json)
+NOTES_URL="https://us-central1-${project_id}.cloudfunctions.net/notes"
 
-  echo "NOTE: Deleting Firestore notes collection..."
-  COLLECTION="projects/${project_id}/databases/(default)/documents/notes"
-  doc_count=0
-  while IFS= read -r doc_name; do
-    [[ -z "${doc_name}" ]] && continue
-    gcloud firestore documents delete "${doc_name}" --quiet
-    doc_count=$((doc_count + 1))
-  done < <(gcloud firestore documents list "${COLLECTION}" \
-    --format="value(name)" --project="${project_id}" 2>/dev/null)
-  echo "NOTE: Deleted ${doc_count} document(s) from notes collection."
-fi
+# ─── Delete all notes via API ────────────────────────────────────────────────────
+echo "NOTE: Deleting all notes via API..."
+LIST_RESPONSE=$(curl -sf "${NOTES_URL}") || { echo "ERROR: GET /notes request failed"; exit 1; }
+NOTE_IDS=$(echo "${LIST_RESPONSE}" | jq -r '.items[]?.id // empty')
 
+doc_count=0
+while IFS= read -r id; do
+  [[ -z "${id}" ]] && continue
+  curl -sf -X DELETE "${NOTES_URL}/${id}" > /dev/null || { echo "ERROR: DELETE /notes/${id} failed"; exit 1; }
+  echo "NOTE: Deleted note ${id}"
+  doc_count=$((doc_count + 1))
+done <<< "${NOTE_IDS}"
+echo "NOTE: Deleted ${doc_count} document(s) from notes collection."
+
+# ─── Destroy infrastructure ──────────────────────────────────────────────────────
 echo "NOTE: Destroying web application..."
 cd 02-webapp
 terraform destroy -auto-approve
