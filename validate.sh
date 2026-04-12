@@ -31,7 +31,7 @@ for i in {1..5}; do
 
   RESPONSE=$(curl -sf -X POST "${NOTES_URL}" \
     -H "Content-Type: application/json" \
-    -d "${PAYLOAD}")
+    -d "${PAYLOAD}") || { echo "ERROR: POST request failed for note ${i}"; exit 1; }
 
   NOTE_ID=$(echo "${RESPONSE}" | jq -r '.id // empty')
   if [[ -z "${NOTE_ID}" ]]; then
@@ -45,7 +45,7 @@ done
 
 # ─── List notes ─────────────────────────────────────────────────────────────────
 echo "NOTE: Listing notes..."
-LIST_RESPONSE=$(curl -sf "${NOTES_URL}")
+LIST_RESPONSE=$(curl -sf "${NOTES_URL}") || { echo "ERROR: GET /notes request failed"; exit 1; }
 NOTE_COUNT=$(echo "${LIST_RESPONSE}" | jq '.items | length')
 
 if [[ "${NOTE_COUNT}" -lt 5 ]]; then
@@ -57,7 +57,7 @@ echo "NOTE: List endpoint returned ${NOTE_COUNT} notes"
 # ─── Get each note ───────────────────────────────────────────────────────────────
 echo "NOTE: Fetching each note by ID..."
 for ID in "${NOTE_IDS[@]}"; do
-  TITLE=$(curl -sf "${NOTES_URL}/${ID}" | jq -r '.title // empty')
+  TITLE=$(curl -sf "${NOTES_URL}/${ID}" | jq -r '.title // empty') || { echo "ERROR: GET /notes/${ID} request failed"; exit 1; }
   if [[ -z "${TITLE}" ]]; then
     echo "ERROR: Failed to fetch note ${ID}"
     exit 1
@@ -75,7 +75,7 @@ for ID in "${NOTE_IDS[@]}"; do
 
   UPDATED_TITLE=$(curl -sf -X PUT "${NOTES_URL}/${ID}" \
     -H "Content-Type: application/json" \
-    -d "${UPDATE_PAYLOAD}" | jq -r '.title // empty')
+    -d "${UPDATE_PAYLOAD}" | jq -r '.title // empty') || { echo "ERROR: PUT /notes/${ID} request failed"; exit 1; }
 
   if [[ -z "${UPDATED_TITLE}" ]]; then
     echo "ERROR: Failed to update note ${ID}"
@@ -87,7 +87,7 @@ done
 # ─── Delete each note ────────────────────────────────────────────────────────────
 echo "NOTE: Deleting each note..."
 for ID in "${NOTE_IDS[@]}"; do
-  curl -sf -X DELETE "${NOTES_URL}/${ID}" > /dev/null
+  curl -sf -X DELETE "${NOTES_URL}/${ID}" > /dev/null || { echo "ERROR: DELETE /notes/${ID} request failed"; exit 1; }
   echo "NOTE: Deleted note ${ID}"
 done
 
