@@ -9,12 +9,15 @@ if [ -f credentials.json ]; then
   gcloud config set project "${project_id}" 2>/dev/null
 
   echo "NOTE: Deleting Firestore notes collection..."
-  gcloud firestore bulk-delete \
-    --collection-ids=notes \
-    --namespace-ids='(default)' \
-    --project="${project_id}" \
-    --quiet 2>/dev/null \
-    || echo "NOTE: No documents to delete or collection already empty."
+  COLLECTION="projects/${project_id}/databases/(default)/documents/notes"
+  doc_count=0
+  while IFS= read -r doc_name; do
+    [[ -z "${doc_name}" ]] && continue
+    gcloud firestore documents delete "${doc_name}" --quiet
+    doc_count=$((doc_count + 1))
+  done < <(gcloud firestore documents list "${COLLECTION}" \
+    --format="value(name)" --project="${project_id}" 2>/dev/null)
+  echo "NOTE: Deleted ${doc_count} document(s) from notes collection."
 fi
 
 echo "NOTE: Destroying web application..."
