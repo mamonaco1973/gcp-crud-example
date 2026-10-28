@@ -1,260 +1,118 @@
-# GCP Serverless CRUD API with Cloud Functions, Firestore, and Cloud Storage
+# Serverless CRUD API on GCP: Cloud Functions and Firestore
 
-This project delivers a fully automated **serverless CRUD (Create, Read, Update,
-Delete) API** on Google Cloud Platform, built using **Cloud Functions (2nd Gen)**,
-**Cloud Firestore**, and **Cloud Storage**.
+A small serverless **notes** API with a browser front end. One
+second-generation **Cloud Function** serves all five CRUD endpoints, routing
+by method and path itself, and stores notes in **Firestore**. A single-page
+web app, served from a public **Cloud Storage** bucket, calls the API from
+the browser.
 
-![webapp](webapp.png)
+![Notes web app](webapp.png)
 
-It uses **Terraform** and **Python** to provision and deploy a **stateless,
-REST-style backend** that exposes HTTP endpoints for managing simple "notes" data
-— all without running or managing any virtual machines or containers.
+| Piece | Where | Role |
+|---|---|---|
+| **notes** | Cloud Functions, `us-central1` | 2nd gen, Python 3.11, 60 s timeout; entry point `notes`; `run.invoker` granted to `allUsers`; CORS allows any origin |
+| **notes-sa** | IAM | the function's service account, with `roles/datastore.user` |
+| **notes-src-&lt;hex&gt;** | Cloud Storage, `US` | the function's source zip, named by its MD5 so a code change redeploys |
+| **Firestore** | `us-central1` | native mode `(default)` database, created by `api_setup.sh`; `notes` collection, one document per note |
+| **notes-web-&lt;hex&gt;** | Cloud Storage, `US` | public-read bucket holding `index.html` and `favicon.ico` |
 
-For testing and demonstration purposes, a lightweight **HTML web frontend**
-interacts directly with the deployed API, allowing users to create, view, update,
-and delete notes from a browser.
+## Architecture
 
-![diagram](gcp-crud-example.png)
+<picture>
+  <source media="(prefers-color-scheme: dark)" srcset="architecture-dark.svg">
+  <img alt="A browser loads index.html from the public notes-web Cloud Storage bucket, then calls notes, a second-generation Python 3.11 Cloud Function that allUsers may invoke and that routes /notes and /notes/{id} itself by method and path. It runs as the notes-sa service account, which has roles/datastore.user, and reads and writes the notes collection in the default Firestore database." src="architecture-light.svg">
+</picture>
 
-This design follows a **serverless microservice architecture** where a single
-Cloud Function routes requests by HTTP method and path, Firestore provides fully
-managed NoSQL persistence, and GCP handles scaling, availability, and fault
-tolerance automatically.
+Regenerate with `python3 make_diagram.py`.
 
-Key capabilities demonstrated:
+- **`01-functions/`**: `main.tf` (the service account and its role, the
+  source bucket, the function and its public invoker binding) and the code
+  in `notes/main.py`.
+- **`02-webapp/`**: the web bucket and its public-read binding, and
+  `index.html.tmpl`, which `apply.sh` fills in with the API URL.
 
-1. **Serverless CRUD API** – Implements REST-style endpoints backed by a single
-   Cloud Function that routes all five operations internally by method and path.
-2. **Stateless Compute Layer** – The function is independent and stateless,
-   enabling horizontal scaling and zero idle cost.
-3. **Managed NoSQL Storage** – Uses Firestore (Native mode) for low-latency,
-   fully managed document persistence with no capacity planning required.
-4. **Infrastructure as Code (IaC)** – Terraform provisions the Cloud Function,
-   service account, IAM bindings, GCS buckets, and supporting resources in a
-   repeatable, auditable way.
-5. **Browser-Based Test Client** – A simple static HTML frontend served from
-   Cloud Storage demonstrates real-time interaction with the API without
-   requiring additional tooling.
+## API
 
-Together, these components form a **clean, minimal reference architecture** for
-building serverless APIs on GCP — suitable for learning, prototyping, or extending
-into more advanced event-driven and authenticated microservices.
+The base URL is `https://us-central1-<project>.cloudfunctions.net`; the
+function is `notes`, and it reads everything after `/notes` as the note ID.
+There's no authentication. Every note
+gets the hardcoded owner `"global"`, and listing queries on it.
 
-## API Endpoints
+| Method | Path | Returns |
+|---|---|---|
+| POST | `/notes` | `201` `{id, title, note}`; `400` if `title` or `note` is missing |
+| GET | `/notes` | `{"items": [...]}` |
+| GET | `/notes/{id}` | the note, or `404` |
+| PUT | `/notes/{id}` | the updated note; `400` if `title` or `note` is missing, `404` if it doesn't exist |
+| DELETE | `/notes/{id}` | `200`, or `404` if it doesn't exist |
 
-The **Notes API** exposes REST-style CRUD endpoints through a **Cloud Functions
-2nd Gen HTTP function**. All endpoints return JSON and work with both CLI and
-browser-based clients.
+Each note gets a UUID `id`, used as the document ID, and `created_at` /
+`updated_at` timestamps.
 
-The base URL after deployment is:
-```
-https://us-central1-<project_id>.cloudfunctions.net/notes
-```
-
-> Note: In this simplified demo, the note `owner` is hardcoded to `"global"` in
-> the function handler.
-
-### API Endpoint Summary
-
-| Method | Path | Purpose | Input | Firestore Operation |
-|--------|------|---------|-------|---------------------|
-| POST | `/notes` | Create a new note | JSON body (`title`, `note`) | `document.set()` |
-| GET | `/notes` | List all notes | None | `collection.where(owner).stream()` |
-| GET | `/notes/{id}` | Retrieve a single note by ID | Path param (`id`) | `document.get()` |
-| PUT | `/notes/{id}` | Update an existing note | Path param + JSON body | `document.update()` |
-| DELETE | `/notes/{id}` | Delete a note by ID | Path param (`id`) | `document.delete()` |
-
-### Request & Response Characteristics
-
-| Aspect | Behavior |
-|--------|----------|
-| Authentication | None (demo-only) |
-| Content Type | `application/json` |
-| Owner Model | Hardcoded to `"global"` |
-| Response Format | JSON |
-| Clients | curl, browser, any HTTP client |
-| Error Handling | Standard HTTP status codes |
-
----
-
-### POST /notes
-
-**Purpose:**
-Creates a new note in Firestore.
-
-**Request Body (JSON):**
-```json
-{
-  "title": "Test Note 1",
-  "note": "This is test note 1"
-}
-```
-
-**Parameters:**
-
-| Field | Type | Required | Description |
-|-------|------|----------|-------------|
-| title | string | Yes | Note title |
-| note | string | Yes | Note body/content |
-
-**Example Request:**
 ```bash
-curl -s -X POST https://us-central1-<project_id>.cloudfunctions.net/notes \
+curl -s -X POST https://us-central1-<project>.cloudfunctions.net/notes \
   -H "Content-Type: application/json" \
   -d '{"title":"Test Note 1","note":"This is test note 1"}'
 ```
 
-**Example Response (201):**
-```json
-{
-  "id": "2f2d0c5a-9f5f-4d7d-9e2c-1c8a5b8e3c21",
-  "title": "Test Note 1",
-  "note": "This is test note 1"
-}
-```
-
----
-
-### GET /notes
-
-**Purpose:**
-Lists all notes for the demo owner (`"global"`).
-
-**Example Request:**
-```bash
-curl -s https://us-central1-<project_id>.cloudfunctions.net/notes
-```
-
-**Example Response (200):**
-```json
-{
-  "items": [
-    {
-      "owner": "global",
-      "id": "2f2d0c5a-9f5f-4d7d-9e2c-1c8a5b8e3c21",
-      "title": "Test Note 1",
-      "note": "This is test note 1",
-      "created_at": "2026-01-19T14:12:09.123456+00:00",
-      "updated_at": "2026-01-19T14:12:09.123456+00:00"
-    }
-  ]
-}
-```
-
----
-
-### GET /notes/{id}
-
-**Purpose:**
-Retrieves a single note by ID.
-
-**Example Request:**
-```bash
-curl -s https://us-central1-<project_id>.cloudfunctions.net/notes/<id>
-```
-
----
-
-### PUT /notes/{id}
-
-**Purpose:**
-Updates an existing note.
-
-**Request Body (JSON):**
-```json
-{
-  "title": "Test Note 1",
-  "note": "Updated note"
-}
-```
-
----
-
-### DELETE /notes/{id}
-
-**Purpose:**
-Deletes a note by ID.
-
-**Example Request:**
-```bash
-curl -s -X DELETE https://us-central1-<project_id>.cloudfunctions.net/notes/<id>
-```
-
 ## Prerequisites
 
-* [A Google Cloud Platform Account](https://console.cloud.google.com/)
+* [A Google Cloud Account](https://console.cloud.google.com/)
 * [Install gcloud CLI](https://cloud.google.com/sdk/docs/install)
 * [Install Terraform](https://developer.hashicorp.com/terraform/install)
-* [Install jq](https://stedolan.github.io/jq/download/)
-* A GCP service account JSON key file saved as `credentials.json` in the repo root
+* [Install jq](https://jqlang.github.io/jq/download/) and `envsubst`
 
-The service account needs permissions to create Cloud Functions, Firestore,
-Cloud Storage, Cloud Run, Cloud Build, and IAM bindings.
+Put a service account key in the repository root as `credentials.json`. If
+this is your first time following along, we recommend starting with this
+video: [GCP + Terraform: Easy Setup](https://youtu.be/3spJpYX4f7I).
 
-## Download this Repository
+## Deploy
 
 ```bash
 git clone https://github.com/mamonaco1973/gcp-crud-example.git
 cd gcp-crud-example
+./apply.sh
 ```
 
-## Build the Code
+`check_env.sh` runs `api_setup.sh`, which signs in with `credentials.json`,
+enables the APIs, and creates the Firestore database if it doesn't exist.
+`apply.sh` then applies `01-functions`, renders `02-webapp/index.html` from
+the template with `envsubst`, and applies `02-webapp`. It ends by running
+`validate.sh`, which creates five notes, lists them, fetches, updates and
+deletes each one, retrying while the function comes up:
 
-Place your `credentials.json` in the repo root, then run [apply](apply.sh) to
-provision all infrastructure.
+```
+NOTE: Created note 1 (id=2f2d0c5a-9f5f-4d7d-9e2c-1c8a5b8e3c21)
+...
+NOTE: List endpoint returned 5 notes
+...
+NOTE: Deleted note 2f2d0c5a-9f5f-4d7d-9e2c-1c8a5b8e3c21
+
+  Deployment validated!
+
+  API : https://us-central1-my-project.cloudfunctions.net/notes
+  Web : https://storage.googleapis.com/notes-web-<hex>/index.html
+```
+
+## Try it
+
+1. Open the **Web** URL and add, edit and delete notes in the page.
+2. Or use `curl` against the **API** URL with the routes above.
+
+## Teardown
 
 ```bash
-~/gcp-crud-example$ ./apply.sh
-NOTE: Running environment validation...
-NOTE: Validating required commands...
-NOTE: gcloud found.
-NOTE: terraform found.
-NOTE: jq found.
-NOTE: credentials.json found.
-NOTE: Authenticating with GCP project: my-project-id
-NOTE: Enabling required GCP APIs...
-NOTE: Ensuring Firestore database exists in native mode...
-NOTE: API setup complete.
-NOTE: Deploying Cloud Function and Firestore...
-
-Initializing the backend...
+./destroy.sh
 ```
 
-### Build Results
+`destroy.sh` first deletes every note through the API, because Terraform
+doesn't manage the Firestore database or its documents; the empty database
+stays in the project.
 
-When the deployment completes, the following resources are created:
+## Notes
 
-- **Core Infrastructure:**
-  - Fully serverless architecture — no VMs, containers, or VPC networking required
-  - Terraform-managed provisioning of Cloud Functions, Firestore, and Cloud Storage
-  - Stateless, request-driven design where each API call is handled independently
-
-- **Security & IAM:**
-  - Dedicated service account (`notes-sa`) with scoped `datastore.user` role
-  - Principle-of-least-privilege: the function only has Firestore read/write access
-  - No long-lived credentials embedded in application code
-
-- **Cloud Firestore Collection:**
-  - `notes` collection storing documents keyed by UUID
-  - Each document stores `owner`, `id`, `title`, `note`, `created_at`, and `updated_at`
-  - Native mode with serverless, automatic scaling
-
-- **Cloud Function (`notes`):**
-  - Single Python 3.11 function handling all five CRUD operations
-  - Routes by `request.method` and `request.path` — no API Gateway required
-  - Publicly invokable via Cloud Run IAM (`allUsers` → `roles/run.invoker`)
-
-- **Static Web Application (Cloud Storage):**
-  - Public GCS bucket configured for static website hosting
-  - `index.html` provides a lightweight browser-based interface for managing notes
-  - Frontend dynamically calls the deployed Cloud Function endpoint
-
-- **Automation & Validation:**
-  - `apply.sh`, `destroy.sh`, and `check_env.sh` automate provisioning, teardown,
-    and environment validation
-  - `validate.sh` performs end-to-end API verification using curl and jq
-  - Entire workflow runs using Terraform and gcloud CLI — no manual console setup required
-
-Together, these resources form a **clean, minimal serverless CRUD application**
-that demonstrates modern GCP API design principles — simple, scalable, and fully
-managed from infrastructure to application code.
+- **Lab only.** Anyone can call the function, CORS allows any origin, and
+  the web bucket is public.
+- `.gitignore` doesn't list `credentials.json`, so take care not to commit
+  your key.
+- `check_env.sh` doesn't check for `envsubst`, which `apply.sh` needs.
